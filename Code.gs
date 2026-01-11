@@ -1,7 +1,31 @@
-// GANTI ID SPREADSHEET INI DENGAN ID SPREADSHEET ANDA
+const ALLOWED_EMAILS = [
+  'pannjisaputra@gmail.com', // Admin / Owner
+  'kasircabang1@gmail.com',  // Contoh User 1
+  'finance@gmail.com'        // Contoh User 2
+];
+
 const SPREADSHEET_ID = '1MXdrTIL3TNq8bJylRplIzHU7GPp-7NBMBQOxYT3wzLY';
 
-function doGet() {
+function doGet(e) {
+  // 1. Ambil Email Pengunjung
+  const email = Session.getActiveUser().getEmail();
+
+  // 2. Cek Apakah Email Ada di Daftar Izin?
+  // Jika TIDAK ADA (!includes), tolak aksesnya
+  if (!ALLOWED_EMAILS.includes(email)) {
+    return HtmlService.createHtmlOutput(
+      `<div style="font-family:sans-serif; text-align:center; margin-top:50px;">
+         <h2 style="color:#d63031;">⛔ AKSES DITOLAK</h2>
+         <p>Maaf, email Anda <b>(${email || 'Tidak Terdeteksi'})</b> tidak memiliki izin untuk mengakses halaman ini.</p>
+         <p>Silakan hubungi Administrator (pannjisaputra@gmail.com).</p>
+       </div>`
+    )
+    .setTitle('Akses Ditolak')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+  }
+
+  // 3. Jika ADA di Daftar, Buka Aplikasi Seperti Biasa
   return HtmlService.createTemplateFromFile('Index')
       .evaluate()
       .setTitle('Aplikasi Keuangan Multi-Cabang')
@@ -12,6 +36,7 @@ function doGet() {
 function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
 }
+
 
 // --- API: GET DATA ---
 function getAllData() {
