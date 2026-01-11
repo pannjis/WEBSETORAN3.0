@@ -274,11 +274,19 @@ function updateAvailableBranches() {
   const select = document.getElementById('inputCabang');
   
   if(!dateEl || !select || !globalData.cabang) return;
-  
-  const selectedDate = dateEl.value; // Format: YYYY-MM-DD
-  const usedBranches = new Set(); 
 
-  // 1. CEK TRANSAKSI YANG SUDAH ADA HARI INI
+  // --- TAMBAHAN BARU: PROTEKSI RE-INPUT ---
+  // Jika dropdown sedang dikunci (disabled), jangan jalankan fungsi ini
+  // agar nama cabang tidak hilang/kereset.
+  if (select.disabled) {
+    return; 
+  }
+  // ----------------------------------------
+  
+  const selectedDate = dateEl.value; 
+  const usedBranches = new Set();
+  
+  // ... (Sisa kode fungsi ini biarkan sama seperti sebelumnya) ...
   if (globalData.transaksi) {
     globalData.transaksi.forEach(row => {
       let tDate = new Date(row[1]);
@@ -493,47 +501,51 @@ function addToBuffer() {
   // Agar dropdown tidak kereset!
 }
 
-// --- RENDER BUFFER (LOGIKA DISTRIBUTOR FIXED) ---
+// --- UPDATE FUNGSI RENDER BUFFER (DENGAN DRAG & DROP) ---
 function renderBuffer() {
   const tbody = document.querySelector('#bufferTable tbody');
   tbody.innerHTML = '';
-  
-  // 1. TENTUKAN SALDO AWAL
+
+  // 1. HITUNG SALDO (Sama seperti sebelumnya)
   const currentCabang = document.getElementById('inputCabang').value;
   let startSaldo = 0;
-
-  // Jika Distributor, Saldo Awal = Saldo Global. Jika Cabang lain, Saldo Awal = 0 (Hitung selisih saja)
   if (currentCabang === 'DISTRIBUTOR') {
     startSaldo = currentDistributorSaldo;
   }
 
-  let netSaldo = startSaldo; // Mulai hitungan dari Saldo Awal
-  let totalMasukBaru = 0;    // Hanya mencatat transaksi yang baru diketik
+  let netSaldo = startSaldo;
+  let totalMasukBaru = 0;
   
+  // 2. RENDER BARIS TABEL
   transactionBuffer.forEach((item, index) => {
     let val = parseFloat(item.nominal);
     
-    // Logika Buffer
     if (item.tipe === 'Pemasukan') {
-      netSaldo += val;       // Tambah ke Saldo Akhir
-      totalMasukBaru += val; // Catat Pemasukan Baru
+      netSaldo += val;
+      totalMasukBaru += val;
     } else {
-      netSaldo -= val;       // Kurangi dari Saldo Akhir
+      netSaldo -= val;
     }
-    
-    // Tampilan Baris Tabel (Sama seperti sebelumnya)
+  
     let color = item.tipe === 'Pemasukan' ? 'green' : 'red';
     let nominalDisplay = val.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 
-    let row = `<tr>
+    // PERUBAHAN DISINI: Ada kolom tambahan paling kiri (.drag-handle)
+    let row = `<tr data-index="${index}">
+      <td class="drag-handle" style="width: 5%; vertical-align: middle;">
+         <i class="fas fa-bars"></i>
+      </td>
+      
       <td style="width: 25%; vertical-align: middle;">
          <span style="color:${color}; font-weight:bold;">${item.tipe}</span><br>
          <small style="color:#555;">${item.kategori}</small>
       </td>
+      
       <td style="vertical-align: middle;">
         <input type="text" class="buffer-input" value="${item.keterangan}" 
-        onchange="updateBuffer(${index}, 'keterangan', this.value)" placeholder="Ket...">
+             onchange="updateBuffer(${index}, 'keterangan', this.value)" placeholder="Ket...">
       </td>
+      
       <td style="width: 30%; vertical-align: middle;">
         <div style="display:flex; align-items:center;">
            <span style="margin-right:5px; font-weight:bold; color:#555;">Rp</span>
@@ -541,19 +553,21 @@ function renderBuffer() {
            onkeyup="formatRibuan(this)" onblur="updateBuffer(${index}, 'nominal', this.value)">
         </div>
       </td>
+      
       <td style="width: 10%; text-align:center; vertical-align: middle;">
-         <button class="btn-del-mini" onclick="delBuffer(${index})"><i class="fas fa-trash"></i></button>
+         <div style="display:flex; gap:5px; justify-content:center;">
+            <button class="btn-edit-mini" onclick="editBuffer(${index})"><i class="fas fa-pencil-alt"></i></button>
+            <button class="btn-del-mini" onclick="delBuffer(${index})"><i class="fas fa-trash"></i></button>
+         </div>
       </td>
     </tr>`;
     tbody.innerHTML += row;
   });
   
-  // 2. UPDATE FOOTER DENGAN LOGIKA BARU
+  // 3. UPDATE FOOTER (Sama seperti sebelumnya)
   const footerTextDiv = document.querySelector('.buffer-footer > div:first-child');
   if(footerTextDiv) {
-    // Label Saldo Akhir dibedakan sedikit biar user paham
     let labelSaldo = (currentCabang === 'DISTRIBUTOR') ? "Est. Saldo Global Akhir :" : "Selisih Transaksi (Net) :";
-
     footerTextDiv.style.textAlign = 'left'; 
     footerTextDiv.innerHTML = `
       <div style="font-size:13px; color:#666; margin-bottom:2px;">
@@ -564,6 +578,38 @@ function renderBuffer() {
       </div>
     `;
   }
+
+  // 4. AKTIFKAN FITUR DRAG (Hanya sekali inisialisasi)
+  initSortable();
+}
+
+// --- FUNGSI AKTIVASI SORTABLE JS ---
+let sortableInstance = null;
+
+function initSortable() {
+  const tbody = document.querySelector('#bufferTable tbody');
+  
+  // Cek apakah sudah pernah diaktifkan, jika ya, tidak perlu buat baru (biar tidak double)
+  if (sortableInstance) return;
+
+  sortableInstance = new Sortable(tbody, {
+    handle: '.drag-handle', // Hanya bisa geser kalau klik icon baris 3
+    animation: 150,         // Animasi halus saat geser
+    ghostClass: 'sortable-ghost', // Class CSS saat digeser
+    
+    // EVENT SAAT SELESAI GESER
+    onEnd: function (evt) {
+      // Kita harus ubah urutan data di Array transactionBuffer 
+      // agar sesuai dengan tampilan tabel yang baru digeser
+      
+      const item = transactionBuffer.splice(evt.oldIndex, 1)[0]; // Ambil item lama
+      transactionBuffer.splice(evt.newIndex, 0, item); // Masukkan ke posisi baru
+      
+      // Render ulang agar index di tombol Edit/Hapus diperbarui
+      // (Penting agar tombol hapus tidak salah hapus baris)
+      renderBuffer();
+    }
+  });
 }
 
 // --- FUNGSI BARU: UPDATE DATA SAAT DIEDIT ---
@@ -594,6 +640,43 @@ function delBuffer(index) {
   // Biarkan user tenang mengedit draftnya
 }
 
+// --- FUNGSI BARU: EDIT BUFFER (KEMBALIKAN KE FORM) ---
+function editBuffer(index) {
+  // 1. Ambil data dari array berdasarkan index
+  const item = transactionBuffer[index];
+
+  // 2. Set Tipe Transaksi (Pemasukan/Pengeluaran)
+  // Ini penting agar dropdown Kategori menyesuaikan isinya
+  if (typeof setTrxType === "function") {
+    setTrxType(item.tipe);
+  }
+
+  // 3. Isi Kembali Form Input
+  // Kita gunakan timeout kecil untuk memastikan dropdown kategori sudah ter-load
+  setTimeout(() => {
+     document.getElementById('inputKategori').value = item.kategori;
+  }, 50);
+  
+  document.getElementById('inputMetode').value = item.metode;
+  document.getElementById('inputKet').value = item.keterangan;
+
+  // 4. Format Nominal (tambahkan titik ribuan lagi)
+  let formattedNominal = item.nominal.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  document.getElementById('inputNominal').value = formattedNominal;
+
+  // 5. Hapus data dari Buffer (karena akan diedit ulang)
+  transactionBuffer.splice(index, 1);
+  
+  // 6. Render ulang tabel & Scroll ke Form atas
+  renderBuffer();
+  
+  // Fokus ke field nominal biar enak langsung edit
+  document.getElementById('inputNominal').focus();
+  
+  // Opsional: Scroll ke atas agar user sadar data sudah pindah
+  document.querySelector('.input-container').scrollIntoView({ behavior: 'smooth' });
+}
+
 // --- UPDATE FUNGSI saveAll() ---
 function saveAll() {
   if (transactionBuffer.length === 0) {
@@ -622,28 +705,39 @@ function saveAll() {
 
       // Callback Sukses (Sama untuk kedua mode)
       const onSuccess = function(res) {
-        // Reset Buffer & Mode Edit
-        transactionBuffer = [];
-        editingIds = []; 
-        renderBuffer();
+              transactionBuffer = [];
+              editingIds = []; 
+              renderBuffer();
 
-        // Kembalikan Tombol Simpan ke Warna Hijau
-        const btnSimpan = document.querySelector('#page-input .btn-warning'); // Cek yg kuning
-        if(btnSimpan) {
-            btnSimpan.innerText = 'SIMPAN SEMUA';
-            btnSimpan.classList.remove('btn-warning');
-            btnSimpan.classList.add('btn-success');
-            btnSimpan.style.backgroundColor = '#1e6f48';
-        }
+              // Kembalikan Tombol Simpan ke Warna Hijau
+              const btnSimpan = document.querySelector('#page-input .btn-warning'); 
+              if(btnSimpan) {
+                  btnSimpan.innerText = 'SIMPAN SEMUA';
+                  btnSimpan.classList.remove('btn-warning');
+                  btnSimpan.classList.add('btn-success');
+                  btnSimpan.style.backgroundColor = '#1e6f48';
+              }
 
-        // Refresh Data Global
-        loadAllData(null, null, function() {
-           document.getElementById('inputCabang').value = ""; 
-           toggleLoading(false); 
-           showSuccess(res);
-           setTimeout(() => { printSlip(dataToPrint); }, 1000);
-        });
-      };
+              // --- TAMBAHAN BARU: BUKA KUNCI CABANG ---
+              const cabEl = document.getElementById('inputCabang');
+              if(cabEl) {
+                cabEl.disabled = false; // Buka kunci
+                cabEl.style.backgroundColor = ""; // Reset warna background
+                cabEl.style.color = ""; // Reset warna text
+                cabEl.value = ""; // Kosongkan pilihan
+              }
+              // -----------------------------------------
+
+              // Refresh Data Global
+              loadAllData(null, null, function() {
+                // Panggil updateAvailableBranches() agar dropdown kembali normal (sesuai tanggal hari ini)
+                updateAvailableBranches(); 
+                
+                toggleLoading(false); 
+                showSuccess(res);
+                setTimeout(() => { printSlip(dataToPrint); }, 1000);
+              });
+            };
 
       // Callback Gagal
       const onFailure = function(err) {
@@ -1201,13 +1295,13 @@ function viewDetail(key) {
           document.getElementById('modalDetailTrx').style.display = 'flex';
 }
 
-// --- FUNGSI RE-INPUT (MEMINDAHKAN DATA KE HALAMAN INPUT) ---
+// --- FUNGSI RE-INPUT (UPDATE: LOCK CABANG) ---
 function triggerReInput(dateStr, branchName) {
   
   // 1. Konfirmasi Awal
   Swal.fire({
     title: 'Re-Input Transaksi?',
-    text: "Data ini akan dipindahkan ke halaman Input untuk diedit ulang. Data lama akan dihapus JIKA Anda menekan tombol 'Simpan Semua' nanti.",
+    text: "Data ini akan dipindahkan ke halaman Input untuk diedit ulang. Data lama akan dihapus JIKA Anda menekan tombol 'UPDATE' nanti.",
     icon: 'warning',
     showCancelButton: true,
     confirmButtonColor: '#f39c12',
@@ -1217,15 +1311,13 @@ function triggerReInput(dateStr, branchName) {
     if (result.isConfirmed) {
       
       // 2. Siapkan Buffer & ID
-      transactionBuffer = []; // Kosongkan buffer saat ini
-      editingIds = []; // Reset ID yang diedit
+      transactionBuffer = []; 
+      editingIds = []; 
 
-      // 3. Loop data dari Modal (currentDetailData) ke Buffer
+      // 3. Loop data dari Modal ke Buffer
       currentDetailData.forEach(d => {
-        // Simpan ID asli agar nanti bisa dihapus di backend
         editingIds.push(d.id);
 
-        // Masukkan ke Buffer (Format harus sama dengan addToBuffer)
         transactionBuffer.push({
           tanggal: dateStr, 
           cabang: branchName, 
@@ -1237,33 +1329,47 @@ function triggerReInput(dateStr, branchName) {
         });
       });
 
-      // 4. Set Form Input agar sesuai dengan data yang diedit
+      // 4. Set Form Input
       document.getElementById('inputDate').value = dateStr;
-      
-      // Set Cabang & Trigger event change agar saldo distributor muncul (jika ada)
+
+      // --- BAGIAN PENTING: LOCK CABANG ---
       const cabEl = document.getElementById('inputCabang');
+      
+      // A. Bersihkan dropdown dan paksa isi dengan cabang target saja
+      cabEl.innerHTML = ''; 
+      let opt = document.createElement('option');
+      opt.value = branchName;
+      opt.innerText = branchName;
+      opt.selected = true;
+      cabEl.appendChild(opt);
+
+      // B. Kunci Element (Freeze)
       cabEl.value = branchName;
+      cabEl.disabled = true; // <--- Ini yang membuat tidak bisa diklik
+      cabEl.style.backgroundColor = "#e0e0e0"; // Visual abu-abu tanda terkunci
+      cabEl.style.color = "#555";
+      
+      // C. Trigger Logic Distributor (Jika ada saldo)
       if(typeof checkDistributorStats === 'function') checkDistributorStats(cabEl);
-      if(typeof updateAvailableBranches === 'function') updateAvailableBranches();
 
       // 5. Pindah Halaman & Render
-      closeDetail(); // Tutup Modal
-      showPage('input'); // Pindah ke Tab Input
-      renderBuffer(); // Tampilkan data di tabel
+      closeDetail(); 
+      showPage('input'); 
+      renderBuffer(); 
 
-      // 6. Beri Notifikasi Visual bahwa sedang Mode Edit
-      Toast.fire({ 
-        icon: 'info', 
-        title: 'Mode Re-Input Aktif. Silakan edit dan Simpan.' 
-      });
-      
-      // Ubah Tombol Simpan jadi warna Kuning biar sadar ini Edit
-      const btnSimpan = document.querySelector('#page-input .btn-success');
-      if(btnSimpan) {
+      // 6. Notifikasi & Ubah Tombol Simpan
+      Toast.fire({ icon: 'info', title: 'Mode Re-Input Aktif.' });
+
+      const btnSimpan = document.querySelector('#page-input .btn-success'); // Cari tombol hijau
+      if(btnSimpan) { // Ubah jadi kuning
         btnSimpan.innerText = 'UPDATE (TIMPA DATA LAMA)';
         btnSimpan.classList.remove('btn-success');
         btnSimpan.classList.add('btn-warning');
         btnSimpan.style.backgroundColor = '#f39c12';
+      } else {
+         // Fallback jika tombol sudah kuning (dari proses sebelumnya)
+         const btnKuning = document.querySelector('#page-input .btn-warning');
+         if(btnKuning) btnKuning.innerText = 'UPDATE (TIMPA DATA LAMA)';
       }
     }
   });
