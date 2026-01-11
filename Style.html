@@ -1016,4 +1016,46 @@ button {
   overflow-y: auto;
   border: 1px solid #eee;
 }
+
+/* --- Tambahkan di file Style.html --- */
+
+.btn-edit-mini {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: none;
+  background: #e3f2fd; /* Biru Muda */
+  color: #0984e3;      /* Biru Tua */
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: 0.2s;
+}
+.btn-edit-mini:hover {
+  background: #0984e3;
+  color: white;
+}
+
+/* --- Tambahkan di Style.html --- */
+
+/* Kolom Handle (Pegangan) */
+.drag-handle {
+  cursor: grab; /* Kursor bentuk tangan terbuka */
+  color: #b2bec3;
+  font-size: 16px;
+  text-align: center;
+  transition: color 0.2s;
+}
+
+.drag-handle:hover {
+  color: #2d3436; /* Warna lebih gelap saat hover */
+  cursor: grabbing; /* Kursor bentuk tangan menggenggam */
+}
+
+/* Efek saat baris sedang digeser */
+.sortable-ghost {
+  background-color: #f0f9ff;
+  opacity: 0.8;
+}
 </style>
