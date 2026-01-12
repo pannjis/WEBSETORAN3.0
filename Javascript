@@ -10,20 +10,19 @@ const ADMIN_EMAIL = "pannjisaputra@gmail.com"; // Email Admin Yang Diizinkan
 // --- INITIALIZATION ---
 window.onload = function() {
   const today = new Date().toISOString().split('T')[0];
-  const firstDay = new Date(new Date().setDate(1)).toISOString().split('T')[0];
   
-  safeSetValue('dashStart', firstDay);
-  safeSetValue('dashEnd', today);
+// GANTI JADI 'today' SEMUA:
+  safeSetValue('dashStart', today); // Awal Dashboard = HARI INI
+  safeSetValue('dashEnd', today);   // Akhir Dashboard = HARI INI
   safeSetValue('inputDate', today);
-  safeSetValue('repStart', firstDay);
-  safeSetValue('repEnd', today);
+  safeSetValue('repStart', today);  // Awal Laporan = HARI INI
+  safeSetValue('repEnd', today);    // Akhir Laporan = HARI INI
   
-  // --- TAMBAHAN BARU: AMBIL EMAIL USER ---
+// --- AMBIL EMAIL USER ---
   google.script.run.withSuccessHandler(function(email) {
     currentUserEmail = email;
-    console.log("Login sebagai: " + email); // Untuk cek di Console browser
+    console.log("Login sebagai: " + email); 
   }).getUserEmail();
-  // ---------------------------------------
 
   loadAllData();
 };
@@ -208,13 +207,11 @@ function showPage(pageId) {
   if (pageId === 'report') {
     // Pastikan tanggal default sudah terisi (Awal bulan s/d Hari ini)
     const today = new Date().toISOString().split('T')[0];
-    const firstDay = new Date(new Date().setDate(1)).toISOString().split('T')[0];
     
-    // Cek jika input tanggal masih kosong, isi dulu
-    if(!document.getElementById('repStart').value) document.getElementById('repStart').value = firstDay;
+    if(!document.getElementById('repStart').value) document.getElementById('repStart').value = today; // <-- Ganti jadi today
     if(!document.getElementById('repEnd').value) document.getElementById('repEnd').value = today;
 
-    loadReport(); // <--- INI KUNCINYA (Jalankan Filter Otomatis)
+    loadReport(); // <--- Jalankan Filter Otomatis
   }
 }
 
@@ -235,34 +232,39 @@ function renderDropdowns() {
   updateCategoryOptions();
 }
 
-// --- FUNGSI BARU: ISI PILIHAN CABANG DI LAPORAN ---
 function populateReportFilter() {
   const select = document.getElementById('repCabang');
   if(!select || !globalData.cabang) return;
 
-  // Simpan pilihan saat ini agar tidak kereset saat refresh
   const savedVal = select.value;
-
   select.innerHTML = '';
   
-  // Opsi Default: Semua Cabang
+  // Opsi Default
   let defOpt = document.createElement('option');
   defOpt.value = "";
   defOpt.innerText = "Semua Cabang";
   select.appendChild(defOpt);
 
-  // Loop Data Cabang dari Spreadsheet
+  // --- UPDATE: KUMPULKAN & URUTKAN (A-Z) ---
+  let branchList = [];
+
   globalData.cabang.forEach(row => {
-    // Pastikan datanya ada (row[1] adalah Nama Cabang)
     if (row && row.length > 1 && row[1] !== 'Nama Cabang') { 
-      let opt = document.createElement('option');
-      opt.value = row[1];
-      opt.innerText = row[1];
-      select.appendChild(opt);
+      branchList.push(row[1]);
     }
   });
 
-  // Kembalikan pilihan user (jika ada)
+  // Sortir
+  branchList.sort((a, b) => a.localeCompare(b));
+
+  // Tampilkan
+  branchList.forEach(nama => {
+      let opt = document.createElement('option');
+      opt.value = nama;
+      opt.innerText = nama;
+      select.appendChild(opt);
+  });
+
   if (savedVal) {
     select.value = savedVal;
   }
@@ -299,6 +301,7 @@ function updateAvailableBranches() {
   }
 
   // 2. RENDER ULANG DROPDOWN CABANG
+// 2. RENDER ULANG DROPDOWN CABANG
   select.innerHTML = '';
   
   // Opsi Default
@@ -308,25 +311,31 @@ function updateAvailableBranches() {
   defaultOpt.selected = true;
   select.appendChild(defaultOpt);
 
-  // Loop Master Data Cabang
+  // --- UPDATE: KUMPULKAN & URUTKAN (A-Z) ---
+  let availableList = [];
+
   globalData.cabang.forEach(row => {
     if (row && row.length > 1) {
       const namaCabang = row[1];
       
-      // --- PERBAIKAN LOGIKA DISINI ---
-      // Tampilkan cabang jika:
-      // A. Belum pernah input hari ini (!usedBranches.has)
-      // B. ATAU... Namanya adalah 'DISTRIBUTOR' (Pengecualian Khusus)
-      
+      // Logika Filter (Belum input hari ini ATAU Distributor)
       if (!usedBranches.has(namaCabang) || namaCabang === 'DISTRIBUTOR') {
-        let opt = document.createElement('option');
-        opt.value = namaCabang;
-        opt.innerText = namaCabang;
-        select.appendChild(opt);
+         availableList.push(namaCabang);
       }
     }
   });
-  
+
+  // Urutkan Array Nama Cabang
+  availableList.sort((a, b) => a.localeCompare(b));
+
+  // Tampilkan ke Dropdown
+  availableList.forEach(nama => {
+      let opt = document.createElement('option');
+      opt.value = nama;
+      opt.innerText = nama;
+      select.appendChild(opt);
+  });
+
   // Opsi Tambah Baru
   let addNew = document.createElement('option');
   addNew.value = 'NEW';
@@ -361,7 +370,15 @@ function populateSelect(id, dataArray) {
   select.appendChild(defaultOpt);
 
   if (Array.isArray(dataArray)) {
-    dataArray.forEach(row => {
+    // --- UPDATE: URUTKAN ABJAD (A-Z) ---
+    // Kita copy array dulu [...dataArray] agar data asli tidak teracak
+    let sortedData = [...dataArray].sort((a, b) => {
+        let nameA = String(a[1] || "").toUpperCase(); // Ambil Nama (Kolom ke-2)
+        let nameB = String(b[1] || "").toUpperCase();
+        return nameA.localeCompare(nameB);
+    });
+
+    sortedData.forEach(row => {
       if (row && row.length > 1) {
         let opt = document.createElement('option');
         opt.value = row[1];
@@ -501,130 +518,221 @@ function addToBuffer() {
   // Agar dropdown tidak kereset!
 }
 
-// --- UPDATE FUNGSI RENDER BUFFER (DENGAN DRAG & DROP) ---
+// --- UPDATE FUNGSI RENDER BUFFER (VERSI FREEZE CABANG) ---
 function renderBuffer() {
   const tbody = document.querySelector('#bufferTable tbody');
   tbody.innerHTML = '';
 
-  // 1. HITUNG SALDO (Sama seperti sebelumnya)
+  // 1. SIAPKAN VARIABEL HITUNG
   const currentCabang = document.getElementById('inputCabang').value;
   let startSaldo = 0;
+  
   if (currentCabang === 'DISTRIBUTOR') {
     startSaldo = currentDistributorSaldo;
   }
 
   let netSaldo = startSaldo;
   let totalMasukBaru = 0;
-  
+  let totalKeluarBaru = 0;
+  let saldoCash = 0; 
+
   // 2. RENDER BARIS TABEL
   transactionBuffer.forEach((item, index) => {
     let val = parseFloat(item.nominal);
-    
+    let met = item.metode.toUpperCase(); 
+
+    // Hitung Saldo Global & Masuk/Keluar
     if (item.tipe === 'Pemasukan') {
       netSaldo += val;
       totalMasukBaru += val;
     } else {
       netSaldo -= val;
+      totalKeluarBaru += val;
+    }
+
+    // Hitung Cash
+    if (met.includes('TUNAI') || met.includes('CASH')) {
+        if (item.tipe === 'Pemasukan') saldoCash += val;
+        else saldoCash -= val; 
     }
   
-      // 1. Tentukan Warna Tipe (Pemasukan=Hijau, Pengeluaran=Merah)
-          let color = item.tipe === 'Pemasukan' ? 'green' : 'red';
-          
-          // 2. Format Nominal
-          let nominalDisplay = val.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    // Style Baris
+    let color = item.tipe === 'Pemasukan' ? 'green' : 'red';
+    let nominalDisplay = val.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    let isTunai = met.includes('TUNAI') || met.includes('CASH');
+    let badgeBg = isTunai ? '#e8f5e9' : '#e3f2fd'; 
+    let badgeColor = isTunai ? '#2e7d32' : '#0984e3';
 
-          // 3. LOGIKA BARU: Tentukan Warna Badge Metode (Tunai vs Non-Tunai)
-          let met = item.metode.toUpperCase();
-          let isTunai = met.includes('TUNAI') || met.includes('CASH');
-          
-          // Jika Tunai: Latar Hijau Muda, Teks Hijau Tua
-          // Jika Bank/Lainnya: Latar Biru Muda, Teks Biru Tua
-          let badgeBg = isTunai ? '#e8f5e9' : '#e3f2fd'; 
-          let badgeColor = isTunai ? '#2e7d32' : '#0984e3';
-
-          // 4. Render HTML Baris
-          let row = `<tr data-index="${index}">
-            <td class="drag-handle" style="width: 5%; vertical-align: middle; text-align:center;">
-              <i class="fas fa-bars"></i>
-            </td>
-            
-            <td style="width: 25%; vertical-align: middle;">
-              <span style="color:${color}; font-weight:bold; font-size:13px;">${item.tipe}</span><br>
-              
-              <small style="color:#555; font-weight:500;">${item.kategori}</small><br>
-              
-              <span style="display:inline-block; margin-top:4px; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:bold; background-color:${badgeBg}; color:${badgeColor}; border:1px solid ${badgeBg};">
-                  ${met}
-              </span>
-            </td>
-            
-            <td style="vertical-align: middle;">
-              <input type="text" class="buffer-input" value="${item.keterangan}" 
-                  onchange="updateBuffer(${index}, 'keterangan', this.value)" placeholder="Ket...">
-            </td>
-            
-            <td style="width: 30%; vertical-align: middle;">
-              <div style="display:flex; align-items:center;">
-                <span style="margin-right:5px; font-weight:bold; color:#555;">Rp</span>
-                <input type="text" class="buffer-input" value="${nominalDisplay}" 
-                onkeyup="formatRibuan(this)" onblur="updateBuffer(${index}, 'nominal', this.value)">
-              </div>
-            </td>
-            
-            <td style="width: 10%; text-align:center; vertical-align: middle;">
-              <div style="display:flex; gap:5px; justify-content:center;">
-                  <button class="btn-edit-mini" onclick="editBuffer(${index})"><i class="fas fa-pencil-alt"></i></button>
-                  <button class="btn-del-mini" onclick="delBuffer(${index})"><i class="fas fa-trash"></i></button>
-              </div>
-            </td>
-          </tr>`;
-          
-          tbody.innerHTML += row;
+    let row = `<tr data-index="${index}">
+      <td class="drag-handle" style="width: 5%; vertical-align: middle; text-align:center;">
+        <i class="fas fa-bars"></i>
+      </td>
+      <td style="width: 25%; vertical-align: middle;">
+        <span style="color:${color}; font-weight:bold; font-size:13px;">${item.tipe}</span><br>
+        <small style="color:#555; font-weight:500;">${item.kategori}</small><br>
+        <span style="display:inline-block; margin-top:4px; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:bold; background-color:${badgeBg}; color:${badgeColor}; border:1px solid ${badgeBg};">
+            ${met}
+        </span>
+      </td>
+      <td style="vertical-align: middle;">
+        <input type="text" class="buffer-input" value="${item.keterangan}" 
+          onchange="updateBuffer(${index}, 'keterangan', this.value)" placeholder="Ket...">
+      </td>
+      <td style="width: 30%; vertical-align: middle;">
+        <div style="display:flex; align-items:center;">
+          <span style="margin-right:5px; font-weight:bold; color:#555;">Rp</span>
+          <input type="text" class="buffer-input" value="${nominalDisplay}" 
+          onkeyup="formatRibuan(this)" onblur="updateBuffer(${index}, 'nominal', this.value)">
+        </div>
+      </td>
+      <td style="width: 10%; text-align:center; vertical-align: middle;">
+        <div style="display:flex; gap:5px; justify-content:center;">
+            <button class="btn-edit-mini" onclick="editBuffer(${index})"><i class="fas fa-pencil-alt"></i></button>
+            <button class="btn-del-mini" onclick="delBuffer(${index})"><i class="fas fa-trash"></i></button>
+        </div>
+      </td>
+    </tr>`;
+    tbody.innerHTML += row;
   });
   
-  // 3. UPDATE FOOTER (Sama seperti sebelumnya)
+  // 3. UPDATE FOOTER (Layout Atas-Bawah)
+  const footerContainer = document.querySelector('.buffer-footer');
+  if(footerContainer) {
+      footerContainer.style.flexDirection = 'column';
+      footerContainer.style.alignItems = 'stretch';
+      footerContainer.style.gap = '15px';
+  }
+
   const footerTextDiv = document.querySelector('.buffer-footer > div:first-child');
   if(footerTextDiv) {
-    let labelSaldo = (currentCabang === 'DISTRIBUTOR') ? "Est. Saldo Global Akhir :" : "Selisih Transaksi (Net) :";
+    let labelSaldo = (currentCabang === 'DISTRIBUTOR') ? "Est. Saldo Global Akhir :" : "Selisih Net (SALDO) :";
+    
     footerTextDiv.style.textAlign = 'left'; 
     footerTextDiv.innerHTML = `
-      <div style="font-size:13px; color:#666; margin-bottom:2px;">
-         Total Input Baru (Masuk) : <b>${formatRupiah(totalMasukBaru)}</b>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px dashed #eee;">
+         <div>
+            <div style="font-size:11px; color:#888;">Total Input (Masuk)</div>
+            <div style="font-size:14px; font-weight:bold; color:#333;">${formatRupiah(totalMasukBaru)}</div>
+         </div>
+         <div style="text-align:right;">
+            <div style="font-size:11px; color:#888;">Total Input (Keluar)</div>
+            <div style="font-size:14px; font-weight:bold; color:#d63031;">${formatRupiah(totalKeluarBaru)}</div>
+         </div>
       </div>
-      <div style="font-size:16px; font-weight:bold; color:#2d3436;">
-         ${labelSaldo} <b style="color:${netSaldo >= 0 ? '#1e6f48' : '#d33'}">${formatRupiah(netSaldo)}</b>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; padding: 10px 15px; border-radius: 12px; border: 1px solid #eee;">
+         <div>
+            <div style="font-size:12px; color:#555;">${labelSaldo}</div>
+            <div style="font-size:16px; font-weight:800; color:${netSaldo >= 0 ? '#2d3436' : '#d33'};">
+               ${formatRupiah(netSaldo)}
+            </div>
+         </div>
+         <div style="text-align:right;">
+            <div style="font-size:11px; font-weight:bold; color:#2e7d32; margin-bottom:2px;">
+                <i class="fas fa-money-bill-wave"></i> SISA CASH
+            </div>
+            <div style="font-size:16px; font-weight:800; color:#2e7d32; background:#e8f5e9; padding: 2px 10px; border-radius:50px;">
+               ${formatRupiah(saldoCash)}
+            </div>
+         </div>
       </div>
     `;
   }
 
-// 4. LOGIKA TOMBOL FOOTER (DYNAMIC)
+  // 4. TOMBOL AKSI (UPDATE: TAMBAH BATAL SEMUA)
   const btnContainer = document.getElementById('footerActionBtns');
   if (btnContainer) {
+    btnContainer.style.width = '100%'; 
+    btnContainer.style.marginTop = '5px';
+
+    // A. JIKA MODE EDIT (RE-INPUT)
     if (editingIds.length > 0) {
-      // --- JIKA MODE RE-INPUT (Ada ID yang sedang diedit) ---
-      // Tampilkan tombol [BATAL] [UPDATE]
       btnContainer.innerHTML = `
-        <button class="btn-danger" onclick="cancelReInput()" style="min-width:100px;">
-           <i class="fas fa-times"></i> BATAL
-        </button>
-        <button class="btn-warning" onclick="saveAll()" style="min-width:150px; background-color:#f39c12; color:white;">
-           <i class="fas fa-sync-alt"></i> UPDATE
-        </button>
+        <div style="display:flex; gap:10px; width:100%;">
+            <button class="btn-danger" onclick="cancelReInput()" style="flex:1; border-radius: 8px;">
+              <i class="fas fa-times"></i> BATAL
+            </button>
+            <button class="btn-warning" onclick="saveAll()" style="flex:2; background-color:#f39c12; color:white; border-radius: 8px;">
+              <i class="fas fa-sync-alt"></i> UPDATE DATA
+            </button>
+        </div>
       `;
-    } else {
-      // --- JIKA MODE NORMAL ---
-      // Tampilkan tombol [SIMPAN SEMUA]
-      btnContainer.innerHTML = `
-        <button class="btn-success" onclick="saveAll()" style="width:100%;">
-           <i class="fas fa-save"></i> SIMPAN SEMUA
-        </button>
-      `;
+    } 
+    // B. JIKA MODE NORMAL (INPUT BARU)
+    else {
+      // --- PERUBAHAN DISINI: TAMPILKAN 2 TOMBOL JIKA ADA DATA ---
+      if (transactionBuffer.length > 0) {
+          btnContainer.innerHTML = `
+            <div style="display:flex; gap:10px; width:100%;">
+                <button class="btn-danger" onclick="cancelAll()" style="flex:1; border-radius: 8px; font-size:14px; background-color:#ff7675; color:white;">
+                   <i class="fas fa-trash-alt"></i> BATAL SEMUA
+                </button>
+                <button class="btn-success" onclick="saveAll()" style="flex:2; border-radius: 8px; font-size:14px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                   <i class="fas fa-save"></i> SIMPAN SEMUA
+                </button>
+            </div>
+          `;
+      } 
+      // JIKA KOSONG, CUKUP TOMBOL SIMPAN SAJA
+      else {
+          btnContainer.innerHTML = `
+            <button class="btn-success" onclick="saveAll()" style="width:100%; padding: 14px; font-size:15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-radius: 8px;">
+               <i class="fas fa-save"></i> SIMPAN SEMUA
+            </button>
+          `;
+      }
     }
   }
   
-  // 5. Inisialisasi Sortable (jika pakai fitur drag)
   if(typeof initSortable === 'function') initSortable();
+
+  // ... (Bagian atas renderBuffer biarkan sama) ...
+
+  // ===============================================
+  // 5. FITUR BARU: FREEZE CABANG & TANGGAL
+  // ===============================================
+  const cabEl = document.getElementById('inputCabang');
+  const dateEl = document.getElementById('inputDate'); // <--- 1. Ambil Elemen Tanggal
+
+  // Cek apakah ada barang di keranjang/buffer?
+  const isBufferNotEmpty = transactionBuffer.length > 0;
+
+  // A. LOGIKA KUNCI CABANG
+  if (cabEl) {
+    if (isBufferNotEmpty) {
+        cabEl.disabled = true;
+        cabEl.style.backgroundColor = "#e9ecef"; // Abu-abu
+        cabEl.style.cursor = "not-allowed";
+        cabEl.title = "Hapus semua item untuk mengganti cabang";
+    } else {
+        // Buka kunci HANYA JIKA tidak sedang mode edit ulang
+        if (editingIds.length === 0) {
+            cabEl.disabled = false;
+            cabEl.style.backgroundColor = "";
+            cabEl.style.cursor = "";
+            cabEl.title = "";
+        }
+    }
+  }
+
+  // B. LOGIKA KUNCI TANGGAL (INI TAMBAHAN BARUNYA)
+  if (dateEl) {
+    if (isBufferNotEmpty) {
+        dateEl.readOnly = true; // Gunakan readOnly agar kalender tidak muncul
+        dateEl.style.backgroundColor = "#e9ecef"; 
+        dateEl.style.cursor = "not-allowed";
+        dateEl.title = "Selesaikan transaksi saat ini untuk ganti tanggal";
+    } else {
+        if (editingIds.length === 0) {
+            dateEl.readOnly = false;
+            dateEl.style.backgroundColor = "";
+            dateEl.style.cursor = "";
+            dateEl.title = "";
+        }
+    }
+  }
 }
+
 // --- FUNGSI AKTIVASI SORTABLE JS ---
 let sortableInstance = null;
 
@@ -680,6 +788,27 @@ function delBuffer(index) {
   
   // PENTING: JANGAN PANGGIL updateAvailableBranches() DISINI JUGA
   // Biarkan user tenang mengedit draftnya
+}
+
+// --- FUNGSI BARU: BATAL SEMUA (RESET DRAFT) ---
+function cancelAll() {
+  if (transactionBuffer.length === 0) return;
+
+  Swal.fire({
+    title: 'Hapus Draft?',
+    text: "Semua data di tabel akan dihapus. Pilihan Cabang & Tanggal akan terbuka kembali.",
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#d33',
+    confirmButtonText: 'Ya, Hapus Semua',
+    cancelButtonText: 'Tidak'
+  }).then((result) => {
+    if (result.isConfirmed) {
+      transactionBuffer = []; // Kosongkan Array
+      renderBuffer();         // Render ulang (Otomatis buka kunci cabang/tanggal)
+      Toast.fire({ icon: 'success', title: 'Draft berhasil dikosongkan.' });
+    }
+  });
 }
 
 // --- FUNGSI BARU: EDIT BUFFER (KEMBALIKAN KE FORM) ---
@@ -1292,17 +1421,27 @@ function viewDetail(key) {
   const data = window.filteredReportData[key];
   if(!data) return;
 
-  currentDetailData = JSON.parse(JSON.stringify(data.detail)); // Copy data agar aman
-  deletedDetailIds = []; // Reset list hapus
+  currentDetailData = JSON.parse(JSON.stringify(data.detail)); 
+  deletedDetailIds = []; 
   
+  // --- UPDATE TAMPILAN JUDUL (CABANG JADI RAKSASA) ---
   document.getElementById('detailTitle').innerHTML = `
-    Detail Transaksi<br>
-    <small style="font-size:14px; color:#555;">${formatDateString(data.date)} - <b>${data.branch}</b></small>
+    <div style="display:flex; flex-direction:column; align-items:flex-start;">
+        
+        <div style="font-size:13px; color:#888; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:2px;">
+           <i class="fas fa-calendar-alt"></i> ${formatDateString(data.date)} &bull; DETAIL TRANSAKSI
+        </div>
+
+        <div style="font-size:32px; font-weight:800; color:#1e6f48; line-height:1.2; text-transform:uppercase;">
+           ${data.branch}
+        </div>
+        
+    </div>
   `;
   
-        renderDetailTable(); 
-          
-        const actionContainer = document.querySelector('.modal-actions');
+  renderDetailTable(); 
+
+  const actionContainer = document.querySelector('.modal-actions');
           
           // 1. Tombol Standar (Akses Semua User)
           // Tambahkan tombol Re-Input di sini agar siapa saja bisa melihatnya
@@ -2119,29 +2258,32 @@ function cancelReInput() {
   transactionBuffer = [];
   editingIds = [];
   
-  // 2. Render ulang buffer (ini akan otomatis mengembalikan tombol jadi "SIMPAN SEMUA" karena editingIds kosong)
+  // 2. Render ulang buffer
   renderBuffer();
 
-  // 3. Buka Kunci Dropdown Cabang (Penting!)
+  // 3. Buka Kunci Dropdown Cabang & ISI ULANG
   const cabEl = document.getElementById('inputCabang');
   if(cabEl) {
-    cabEl.disabled = false;
+    cabEl.disabled = false; // Buka kunci
     cabEl.style.backgroundColor = "";
     cabEl.style.color = "";
     cabEl.value = ""; // Reset pilihan
+    
+    // --- TAMBAHKAN BARIS INI ---
+    updateAvailableBranches(); 
+    // Fungsi ini akan mengambil data dari globalData.cabang 
+    // dan memasukkannya kembali ke dropdown.
   }
 
   // 4. Kembali ke Halaman Laporan
   showPage('report');
 
   // 5. BUKA KEMBALI MODAL DETAIL
-  // Data detail masih tersimpan di variabel 'currentDetailData', jadi aman untuk dibuka lagi
   const modal = document.getElementById('modalDetailTrx');
   if(modal) {
       modal.style.display = 'flex';
   }
 }
-
 // Helper Format Rupiah Sederhana (Tanpa "Rp" agar rapi di tabel)
 function formatRupiahSimple(num) {
   return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
