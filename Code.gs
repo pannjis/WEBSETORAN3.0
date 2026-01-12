@@ -1,6 +1,6 @@
 const ALLOWED_EMAILS = [
   'pannjisaputra@gmail.com', // Admin / Owner
-  '-',  // Contoh User 1
+  'financeptpaj@gmail.com',  // Contoh User 1
 ];
 
 const SPREADSHEET_ID = '1MXdrTIL3TNq8bJylRplIzHU7GPp-7NBMBQOxYT3wzLY';
