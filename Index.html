@@ -229,10 +229,15 @@
                 <tbody></tbody>
               </table>
             
-            <div class="buffer-footer">
-              <div>Total: <span id="bufferTotal">Rp 0</span></div>
-              <button class="btn-success" onclick="saveAll()">SIMPAN SEMUA</button>
-            </div>
+              <div class="buffer-footer">
+                <div style="flex: 1;">
+                  Total: <span id="bufferTotal">Rp 0</span>
+                </div>
+
+                <div id="footerActionBtns" style="display:flex; gap:10px;">
+                  <button class="btn-success" onclick="saveAll()">SIMPAN SEMUA</button>
+                </div>
+              </div>
           </div>
         </div>
       </div>
