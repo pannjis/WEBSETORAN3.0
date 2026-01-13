@@ -207,6 +207,9 @@ button {
 /* UTILS & ANIMATION */
 .hidden { display: none; }
 .dashboard-row { display: flex; gap: 20px; flex-wrap: wrap; }
+.dashboard-row > .card {
+  min-width: 0; /* PENTING: Mencegah kartu melebar paksa saat data masuk */
+}
 .buffer-footer { margin-top: 20px; display: flex; justify-content: space-between; align-items: center; font-weight: bold; border-top: 1px dashed #ddd; padding-top: 15px; }
 
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -1058,5 +1061,39 @@ button {
 .sortable-ghost {
   background-color: #f0f9ff;
   opacity: 0.8;
+}
+
+/* --- STYLE TAMBAHAN FILTER CEPAT --- */
+#filterPreset {
+  cursor: pointer;
+  background-color: #ffff;
+  color: #2d3436;
+  font-weight: 500;
+  transition: all 0.3s;
+}
+
+#filterPreset:hover {
+  border-color: #1e6f48;
+  color: #1e6f48;
+}
+
+/* Penyesuaian Mobile */
+@media (max-width: 768px) {
+  #filterPreset {
+    width: 100%;       /* Full lebar di HP */
+    margin-right: 0 !important;
+    margin-bottom: 10px; /* Jarak ke input tanggal */
+    text-align: center;
+  }
+}
+
+/* Pastikan Dropdown Preset Laporan lebarnya pas */
+#reportPreset {
+  min-width: 120px; /* Agar teks tidak terpotong */
+  cursor: pointer;
+  background-color: #f8f9fa;
+}
+#reportPreset:hover {
+  border-color: #1e6f48;
 }
 </style>
