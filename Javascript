@@ -1140,31 +1140,32 @@ function terbilang(nominal) {
 function loadDashboard() {
   const startEl = document.getElementById('dashStart');
   if(!startEl) return;
-  
   const startStr = startEl.value;
   const endStr = document.getElementById('dashEnd').value;
   
   let totalMasuk = 0;
   let totalKeluar = 0;
-  let saldoCash = 0; 
+  let saldoCash = 0;
   
+  // Kategori Khusus untuk Tabel Kiri Atas
   let catBarang = 0;
   let catKlinik = 0;
   let catGrooming = 0;
   let catTitip = 0;
 
+  // Variabel untuk Tabel Bawah (Yang Hilang Tadi)
   let cabangStats = {};
   if(globalData.cabang) globalData.cabang.forEach(c => { 
       cabangStats[String(c[1]).trim()] = {masuk: 0, keluar: 0}; 
   });
-  
   let expenseStats = {};
 
-  // 1. HITUNG STATISTIK DASHBOARD (Sesuai Filter Tanggal)
+  // 1. HITUNG STATISTIK DASHBOARD (LOOPING DATA)
   if(globalData.transaksi) {
     globalData.transaksi.forEach(row => {
       let tDateStr = String(row[1]); 
       
+      // Filter Tanggal
       if (tDateStr >= startStr && tDateStr <= endStr) {
         let cab = String(row[2]).trim(); 
         let tipe = row[3];
@@ -1175,20 +1176,25 @@ function loadDashboard() {
 
         let val = (tipe === 'Pemasukan') ? nom : -nom;
 
-        // Kategori Logic
-        if (kategoriUpper.includes('BARANG') || kategoriUpper.includes('PENJUALAN')) catBarang += val;
-        else if (kategoriUpper.includes('KLINIK') || kategoriUpper.includes('DOKTER')) catKlinik += val;
-        else if (kategoriUpper.includes('GROOMING') || kategoriUpper.includes('MANDI')) catGrooming += val;
-        else if (kategoriUpper.includes('PENITIPAN') || kategoriUpper.includes('HOTEL')) catTitip += val;
+        // Hitung Kategori Spesifik (Untuk Tabel Rincian Pemasukan)
+        if (tipe === 'Pemasukan') {
+            if (kategoriUpper.includes('BARANG') || kategoriUpper.includes('PENJUALAN')) catBarang += nom;
+            else if (kategoriUpper.includes('KLINIK') || kategoriUpper.includes('DOKTER')) catKlinik += nom;
+            else if (kategoriUpper.includes('GROOMING') || kategoriUpper.includes('MANDI')) catGrooming += nom;
+            else if (kategoriUpper.includes('PENITIPAN') || kategoriUpper.includes('HOTEL')) catTitip += nom;
+        }
 
+        // Hitung Total & Saldo Cash
         if (tipe === 'Pemasukan') {
           totalMasuk += nom;
           if (metode === 'TUNAI' || metode === 'CASH') saldoCash += nom;
-          if(cabangStats[cab]) cabangStats[cab].masuk += nom;
+          if(cabangStats[cab]) cabangStats[cab].masuk += nom; // Data untuk Performa Cabang
         } else {
           totalKeluar += nom;
           if (metode === 'TUNAI' || metode === 'CASH') saldoCash -= nom;
-          if(cabangStats[cab]) cabangStats[cab].keluar += nom;
+          if(cabangStats[cab]) cabangStats[cab].keluar += nom; // Data untuk Performa Cabang
+          
+          // Data untuk Top Pengeluaran
           if (!expenseStats[kategoriName]) expenseStats[kategoriName] = 0;
           expenseStats[kategoriName] += nom;
         }
@@ -1196,99 +1202,142 @@ function loadDashboard() {
     });
   }
   
-  // Update UI Dashboard Utama
+  // 2. RENDER TOP KPI (Kartu Angka Utama)
   setText('dashIn', formatRupiah(totalMasuk));
   setText('dashOut', formatRupiah(totalKeluar));
   setText('dashCash', formatRupiah(saldoCash)); 
   setText('dashSaldo', formatRupiah(totalMasuk - totalKeluar));
-  setText('dashBarang', formatRupiah(catBarang));
-  setText('dashKlinik', formatRupiah(catKlinik));
-  setText('dashGrooming', formatRupiah(catGrooming));
-  setText('dashTitip', formatRupiah(catTitip));
 
-  renderExpenseTable(expenseStats);
+  // 3. RENDER TABEL BARU (RINCIAN PEMASUKAN) - Kiri Atas
+  const tableMasuk = document.getElementById('tableRincianMasuk');
+  if(tableMasuk) {
+      tableMasuk.innerHTML = `
+        <tr>
+          <td style="padding:10px 5px;"><i class="fas fa-box" style="color:#0288d1; width:20px;"></i> Penjualan Barang</td>
+          <td style="text-align:right; font-weight:bold;">${formatRupiah(catBarang)}</td>
+        </tr>
+        <tr>
+          <td style="padding:10px 5px;"><i class="fas fa-stethoscope" style="color:#2e7d32; width:20px;"></i> Klinik</td>
+          <td style="text-align:right; font-weight:bold;">${formatRupiah(catKlinik)}</td>
+        </tr>
+        <tr>
+          <td style="padding:10px 5px;"><i class="fas fa-pump-soap" style="color:#7b1fa2; width:20px;"></i> Grooming</td>
+          <td style="text-align:right; font-weight:bold;">${formatRupiah(catGrooming)}</td>
+        </tr>
+        <tr>
+          <td style="padding:10px 5px;"><i class="fas fa-home" style="color:#ef6c00; width:20px;"></i> Penitipan</td>
+          <td style="text-align:right; font-weight:bold;">${formatRupiah(catTitip)}</td>
+        </tr>
+      `;
+  }
 
+  // 4. RENDER TABEL PERFORMA CABANG (Bawah Kiri) - INI YANG TADI HILANG
   const tbody = document.querySelector('#tableCabang tbody');
   if(tbody) {
     tbody.innerHTML = '';
     let sortedStats = Object.keys(cabangStats).map(key => {
       return {nama: key, ...cabangStats[key], saldo: cabangStats[key].masuk - cabangStats[key].keluar};
     }).sort((a, b) => b.saldo - a.saldo);
+
     sortedStats.forEach(s => {
-      tbody.innerHTML += `<tr>
-        <td>${s.nama}</td>
-        <td class="text-green">${formatRupiah(s.masuk)}</td>
-        <td class="text-red">${formatRupiah(s.keluar)}</td>
-        <td style="font-weight:bold">${formatRupiah(s.saldo)}</td>
-      </tr>`;
+      // Hanya tampilkan jika ada transaksi (opsional, tapi biar rapi)
+      if(s.masuk > 0 || s.keluar > 0) {
+          tbody.innerHTML += `<tr>
+            <td style="font-weight:600; color:#555;">${s.nama}</td>
+            <td class="text-green">${formatRupiah(s.masuk)}</td>
+            <td class="text-red">${formatRupiah(s.keluar)}</td>
+            <td style="font-weight:bold">${formatRupiah(s.saldo)}</td>
+          </tr>`;
+      }
     });
+    
+    // Jika kosong
+    if(tbody.innerHTML === '') {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center" style="color:#999;">Tidak ada data</td></tr>';
+    }
   }
 
-  // === [BARU] PANGGIL FUNGSI RENDER BANK ===
-  renderBankStats(); 
+  // 5. RENDER TABEL TOP PENGELUARAN (Bawah Kanan) - INI JUGA TADI HILANG
+  renderExpenseTable(expenseStats);
+
+  // 6. RENDER SALDO BANK (Kanan Atas)
+  renderBankStats();
 }
 
-// === [FUNGSI BARU] RENDER CARD BANK (AKUMULASI) ===
 function renderBankStats() {
-  const container = document.getElementById('bankCardsContainer');
-  if (!container) return;
-  container.innerHTML = ''; // Bersihkan isi lama
+  const tbody = document.querySelector('#tableBankSaldo tbody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  // 1. AMBIL TANGGAL FILTER DARI DASHBOARD
+  const startEl = document.getElementById('dashStart');
+  const endEl = document.getElementById('dashEnd');
+  
+  // Safety check
+  if(!startEl || !endEl) return;
+  
+  const startStr = startEl.value;
+  const endStr = endEl.value;
 
   let bankMap = {};
 
-  // 1. Loop SEMUA Transaksi (Tanpa Filter Tanggal) untuk Akumulasi
+  // 2. Loop Transaksi DENGAN FILTER TANGGAL
   if(globalData.transaksi) {
     globalData.transaksi.forEach(row => {
-      let tipe = row[3];
-      let metode = String(row[5]).trim(); // Jangan di-uppercase dulu biar rapi (misal "BCA")
-      let metodeKey = metode.toUpperCase();
-      let nom = parseFloat(row[6]);
+      let tDateStr = String(row[1]); // Ambil Tanggal Transaksi
 
-      // Skip jika metode Tunai/Cash (karena sudah ada di dashboard utama)
-      if(metodeKey === 'TUNAI' || metodeKey === 'CASH') return;
+      // --- LOGIKA FILTER: Cek apakah tanggal masuk range? ---
+      if (tDateStr >= startStr && tDateStr <= endStr) {
+          
+          let tipe = row[3];
+          let metode = String(row[5]).trim();
+          let metodeKey = metode.toUpperCase();
+          let nom = parseFloat(row[6]);
 
-      if(!bankMap[metode]) bankMap[metode] = 0;
+          // Skip Tunai/Cash (karena sudah ada widget sendiri)
+          if(metodeKey === 'TUNAI' || metodeKey === 'CASH') return;
 
-      if (tipe === 'Pemasukan') {
-        bankMap[metode] += nom;
-      } else {
-        bankMap[metode] -= nom;
+          if(!bankMap[metode]) bankMap[metode] = 0;
+
+          if (tipe === 'Pemasukan') {
+            bankMap[metode] += nom;
+          } else {
+            bankMap[metode] -= nom;
+          }
       }
     });
   }
 
-  // 2. Render Card Secara Dinamis
-  const keys = Object.keys(bankMap).sort(); // Urutkan A-Z
+  // 3. Render Tabel
+  const keys = Object.keys(bankMap).sort();
 
   if(keys.length === 0) {
-    container.innerHTML = '<div style="color:#999; font-style:italic; padding:10px;">Belum ada data bank.</div>';
+    tbody.innerHTML = '<tr><td colspan="2" style="color:#999; font-style:italic; text-align:center; padding:10px;">Tidak ada mutasi bank pada periode ini.</td></tr>';
     return;
   }
 
   keys.forEach(namaBank => {
     let saldo = bankMap[namaBank];
     
-    // Tentukan Warna Icon berdasarkan nama bank (Opsional, biar cantik)
-    let iconColor = '#6c5ce7'; // Default Ungu
-    let bgIcon = '#f3e5f5';
-    
-    if(namaBank.toUpperCase().includes('BCA')) { iconColor = '#005691'; bgIcon = '#e3f2fd'; }
-    else if(namaBank.toUpperCase().includes('BRI')) { iconColor = '#0f78d9'; bgIcon = '#e1f5fe'; }
-    else if(namaBank.toUpperCase().includes('MANDIRI')) { iconColor = '#f39c12'; bgIcon = '#fff3e0'; }
-    else if(namaBank.toUpperCase().includes('BNI')) { iconColor = '#e67e22'; bgIcon = '#ffe0b2'; }
+    // Icon logic
+    let iconColor = '#555'; 
+    if(namaBank.toUpperCase().includes('BCA')) iconColor = '#005691';
+    else if(namaBank.toUpperCase().includes('BRI')) iconColor = '#0f78d9';
+    else if(namaBank.toUpperCase().includes('MANDIRI')) iconColor = '#f39c12';
+    else if(namaBank.toUpperCase().includes('BNI')) iconColor = '#e67e22';
 
-    let html = `
-      <div class="card stat-card mini-card">
-        <div class="mini-icon" style="background: ${bgIcon}; color: ${iconColor};">
-          <i class="fas fa-university"></i>
-        </div>
-        <div>
-          <h3 style="font-size:11px; margin-bottom:2px; text-transform:uppercase;">${namaBank}</h3>
-          <h2 style="font-size:16px; margin:0; color:#333;">${formatRupiah(saldo)}</h2>
-        </div>
-      </div>
+    let row = `
+      <tr>
+        <td style="padding:10px 5px; vertical-align:middle;">
+           <i class="fas fa-university" style="color:${iconColor}; margin-right:8px; width:20px;"></i> 
+           <span style="font-weight:500;">${namaBank}</span>
+        </td>
+        <td style="padding:10px 5px; text-align:right; font-weight:bold; font-size:14px; vertical-align:middle;">
+           ${formatRupiah(saldo)}
+        </td>
+      </tr>
     `;
-    container.innerHTML += html;
+    tbody.innerHTML += row;
   });
 }
 
