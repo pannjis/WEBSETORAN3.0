@@ -7,25 +7,49 @@ let currentDistributorSaldo = 0;
 let editingIds = [];
 const ADMIN_EMAIL = "pannjisaputra@gmail.com"; // Email Admin Yang Diizinkan
 
-// --- INITIALIZATION ---
-window.onload = function() {
-  const today = new Date().toISOString().split('T')[0];
-  
-// GANTI JADI 'today' SEMUA:
-  safeSetValue('dashStart', today); // Awal Dashboard = HARI INI
-  safeSetValue('dashEnd', today);   // Akhir Dashboard = HARI INI
-  safeSetValue('inputDate', today);
-  safeSetValue('repStart', today);  // Awal Laporan = HARI INI
-  safeSetValue('repEnd', today);    // Akhir Laporan = HARI INI
-  
-// --- AMBIL EMAIL USER ---
-  google.script.run.withSuccessHandler(function(email) {
-    currentUserEmail = email;
-    console.log("Login sebagai: " + email); 
-  }).getUserEmail();
+    window.onload = function() {
+      // 1. HITUNG TANGGAL
+      const d = new Date();
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0'); // Bulan (01-12)
+      const day = String(d.getDate()).padStart(2, '0');        // Hari ini (01-31)
 
-  loadAllData();
-};
+      const today = `${year}-${month}-${day}`;       // Format: 2026-01-13
+      const firstDay = `${year}-${month}-01`;        // Format: 2026-01-01 (Tanggal 1)
+
+      // 2. SET FILTER DASHBOARD (Tgl 1 s/d Hari Ini)
+      safeSetValue('dashStart', firstDay); // <-- Awal bulan
+      safeSetValue('dashEnd', today);      // <-- Hari ini
+
+      // 3. SET FILTER LAPORAN (Opsional: Samakan saja biar rapi)
+      safeSetValue('repStart', firstDay);
+      safeSetValue('repEnd', today);
+
+      // 4. SET TANGGAL INPUT TRANSAKSI (Tetap Hari Ini)
+      safeSetValue('inputDate', today);
+      
+      // Ambil Email User
+      google.script.run.withSuccessHandler(function(email) {
+        currentUserEmail = email;
+        console.log("Login sebagai: " + email); 
+      }).getUserEmail();
+
+      loadAllData();
+
+      // ... (Listener tombol Enter biarkan ada di sini) ...
+      const enterInputs = ['inputNominal', 'inputKet'];
+      enterInputs.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.addEventListener("keyup", function(event) {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              addToBuffer(); 
+            }
+          });
+        }
+      });
+    };
 
 function safeSetValue(id, val) {
   const el = document.getElementById(id);
@@ -473,24 +497,48 @@ function saveMasterData() {
 }
 
 function addToBuffer() {
+  // 1. Ambil Data Form
   const date = document.getElementById('inputDate').value;
   const cabang = document.getElementById('inputCabang').value;
   const tipe = document.getElementById('inputType').value;
   const kategori = document.getElementById('inputKategori').value;
   const metode = document.getElementById('inputMetode').value;
   const ket = document.getElementById('inputKet').value;
+  
+  // Bersihkan format titik pada nominal
   const nominalStr = document.getElementById('inputNominal').value;
   const nominal = parseFloat(nominalStr.replace(/\./g, ''));
 
-  if (!nominal || nominal <= 0) {
-    Toast.fire({ icon: 'warning', title: 'Nominal wajib diisi!' });
-    return;
+  // 2. VALIDASI BERTINGKAT (Satu per satu)
+  // Cek Cabang
+  if (!cabang || cabang === "" || cabang === 'NEW') {
+     Toast.fire({ icon: 'warning', title: 'Cabang Wajib diisi!' });
+     return;
   }
-  if (!cabang || cabang === 'NEW' || !kategori || kategori === 'NEW') {
-    Toast.fire({ icon: 'warning', title: 'Lengkapi data pilihan!' });
-    return;
+  // Cek Kategori
+  if (!kategori || kategori === "" || kategori === 'NEW') {
+     Toast.fire({ icon: 'warning', title: 'Kategori Wajib diisi!' });
+     return;
+  }
+  // Cek Metode
+  if (!metode || metode === "" || metode === 'NEW') {
+     Toast.fire({ icon: 'warning', title: 'Metode Pembayaran Wajib diisi!' });
+     return;
+  }
+  // Cek Nominal
+  if (isNaN(nominal) || nominal <= 0) {
+     Toast.fire({ icon: 'warning', title: 'Nominal Wajib diisi!' });
+     document.getElementById('inputNominal').focus();
+     return;
+  }
+  // Cek Keterangan (YANG SERING LUPA)
+  if (!ket || ket.trim() === "") {
+     Toast.fire({ icon: 'warning', title: 'Keterangan Wajib diisi!' });
+     document.getElementById('inputKet').focus();
+     return;
   }
 
+  // 3. Jika Lolos Semua -> Masukkan ke Array
   transactionBuffer.push({
     tanggal: date, 
     cabang: cabang, 
@@ -500,22 +548,15 @@ function addToBuffer() {
     nominal: nominal,
     keterangan: ket
   });
-
+  
   renderBuffer();
   
-  // --- BAGIAN INI SAYA HAPUS/UBAH ---
-  // Kita HANYA mereset Nominal dan Keterangan.
-  // Cabang, Kategori, Metode DIBIARKAN TETAP TERPILIH agar input selanjutnya cepat.
+  // 4. Reset Form (Hanya Nominal & Ket)
   document.getElementById('inputNominal').value = '';
   document.getElementById('inputKet').value = '';
-  
-  // FOKUSKAN KEMBALI KE NOMINAL (Opsional, biar cepat ngetik lagi)
-  document.getElementById('inputNominal').focus();
+  document.getElementById('inputNominal').focus(); // Balik ke nominal biar cepat input lagi
   
   Toast.fire({ icon: 'success', title: 'Ditambahkan ke list' });
-
-  // PENTING: JANGAN PANGGIL updateAvailableBranches() DISINI
-  // Agar dropdown tidak kereset!
 }
 
 // --- UPDATE FUNGSI RENDER BUFFER (VERSI FREEZE CABANG) ---
@@ -1201,7 +1242,8 @@ function renderExpenseTable(stats) {
 function loadReport() {
   const start = new Date(document.getElementById('repStart').value);
   const end = new Date(document.getElementById('repEnd').value);
-  const filterCabang = document.getElementById('repCabang').value;
+  // --- PERBAIKAN: Pastikan value string aman ---
+  const filterCabang = document.getElementById('repCabang').value || ""; 
   const tbody = document.querySelector('#reportTable tbody');
   tbody.innerHTML = '';
   
@@ -2358,5 +2400,91 @@ function setTrxType(type) {
 
   // 3. Panggil Fungsi Update Kategori (Sesuai Logic Lama)
   updateCategoryOptions();
+}
+
+// --- FITUR BARU: FILTER TANGGAL CEPAT ---
+function applyDatePreset(type) {
+  // Hapus baris "if (!type) return;" yang lama
+  
+  const today = new Date();
+  let start = new Date(today);
+  let end = new Date(today);
+
+  // LOGIKA FILTER
+  if (type === 'default' || type === '') {
+     // --- LOGIKA RESET: Tanggal 1 s/d Hari Ini ---
+     start.setDate(1); // Set ke Tanggal 1 bulan ini
+     // End tetap hari ini
+  } 
+  else if (type === 'today') {
+     // Hari ini (Start & End sama)
+  } 
+  else if (type === 'yesterday') {
+     start.setDate(today.getDate() - 1);
+     end.setDate(today.getDate() - 1);
+  } 
+  else if (type === 'last7') {
+     start.setDate(today.getDate() - 6); 
+  } 
+  else if (type === 'thisMonth') {
+     // Full Bulan Ini (Tgl 1 s/d Akhir Bulan)
+     start.setDate(1); 
+     end = new Date(today.getFullYear(), today.getMonth() + 1, 0); // Tgl Terakhir
+  } 
+  else if (type === 'lastMonth') {
+     start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+     end = new Date(today.getFullYear(), today.getMonth(), 0);
+  }
+
+  // Masukkan ke Input
+  document.getElementById('dashStart').value = formatYMD(start);
+  document.getElementById('dashEnd').value = formatYMD(end);
+
+  // Jalankan Filter
+  loadDashboard();
+}
+
+// Helper Format Tanggal Lokal (Anti Meleset)
+function formatYMD(dateObj) {
+  const y = dateObj.getFullYear();
+  const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const d = String(dateObj.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+// --- FITUR FILTER CEPAT KHUSUS LAPORAN ---
+function applyReportPreset(type) {
+  if (!type) return; 
+
+  const today = new Date();
+  let start = new Date(today); 
+  let end = new Date(today);   
+
+  // Logika Perhitungan (Sama seperti Dashboard)
+  if (type === 'today') {
+     // Hari ini
+  } 
+  else if (type === 'yesterday') {
+     start.setDate(today.getDate() - 1);
+     end.setDate(today.getDate() - 1);
+  } 
+  else if (type === 'last7') {
+     start.setDate(today.getDate() - 6); 
+  } 
+  else if (type === 'thisMonth') {
+     start.setDate(1); 
+  } 
+  else if (type === 'lastMonth') {
+     start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+     end = new Date(today.getFullYear(), today.getMonth(), 0);
+  }
+
+  // Masukkan ke Kolom Input Laporan (repStart & repEnd)
+  // Pastikan fungsi formatYMD sudah ada (dari fitur dashboard sebelumnya)
+  document.getElementById('repStart').value = formatYMD(start);
+  document.getElementById('repEnd').value = formatYMD(end);
+
+  // Otomatis Klik Tombol Filter
+  loadReport();
 }
 </script>
