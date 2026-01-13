@@ -84,57 +84,47 @@
             </div>
           </div>
 
-          <div class="cards-grid mini-grid">
-  <div class="card stat-card mini-card">
-    <div class="mini-icon" style="background: #e1f5fe; color: #0288d1;"><i class="fas fa-box"></i></div>
-    <div>
-      <h3>Penjualan Barang</h3>
-      <h2 id="dashBarang">Rp 0</h2>
-    </div>
-  </div>
+            <div class="dashboard-row" style="margin-bottom: 25px;">
+              
+              <div class="card" style="flex: 1;">
+                <h4 style="margin-bottom: 15px; font-size: 16px; color: #333;">
+                  <i class="fas fa-chart-pie" style="color: #1e6f48; margin-right: 8px;"></i> Rincian Pemasukan
+                </h4>
+                <div class="table-responsive">
+                  <table class="table table-compact" id="tableRincianMasuk">
+                    <tbody>
+                      </tbody>
+                  </table>
+                </div>
+              </div>
 
-  <div class="card stat-card mini-card">
-    <div class="mini-icon" style="background: #e8f5e9; color: #2e7d32;"><i class="fas fa-stethoscope"></i></div>
-    <div>
-      <h3>Klinik</h3>
-      <h2 id="dashKlinik">Rp 0</h2>
-    </div>
-  </div>
+              <div class="card" style="flex: 1;">
+                <h4 style="margin-bottom: 15px; font-size: 16px; color: #333;">
+                  <i class="fas fa-university" style="color: #0984e3; margin-right: 8px;"></i> Saldo Rekening (Real)
+                </h4>
+                <div class="table-responsive">
+                  <table class="table table-compact" id="tableBankSaldo">
+                    <tbody>
+                      </tbody>
+                  </table>
+                </div>
+              </div>
 
-  <div class="card stat-card mini-card">
-    <div class="mini-icon" style="background: #f3e5f5; color: #7b1fa2;"><i class="fas fa-pump-soap"></i></div>
-    <div>
-      <h3>Grooming</h3>
-      <h2 id="dashGrooming">Rp 0</h2>
-    </div>
-  </div>
-
-  <div class="card stat-card mini-card">
-    <div class="mini-icon" style="background: #fff3e0; color: #ef6c00;"><i class="fas fa-home"></i></div>
-    <div>
-      <h3>Penitipan</h3>
-      <h2 id="dashTitip">Rp 0</h2>
-    </div>
-  </div>
-</div>
-<h4 style="margin-bottom: 10px; color: #555; border-left: 4px solid #6c5ce7; padding-left: 10px;">
-  <i class="fas fa-university"></i> Saldo Rekening (Akumulasi Real)
-</h4>
-<div id="bankCardsContainer" class="cards-grid mini-grid">
-  </div>
-<div class="dashboard-row">
-  
-  <div class="card table-card" style="flex: 2;">
-    <h4>Performa Cabang</h4>
-    <div class="table-responsive">
-      <table class="table" id="tableCabang">
-        <thead>
-          <tr><th>Cabang</th><th>Masuk</th><th>Keluar</th><th>Saldo</th></tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </div>
-  </div>
+            </div>
+        </div>
+            <div class="dashboard-row">
+              
+              <div class="card table-card" style="flex: 2;">
+                <h4>Performa Cabang</h4>
+                <div class="table-responsive">
+                  <table class="table" id="tableCabang">
+                    <thead>
+                      <tr><th>Cabang</th><th>Masuk</th><th>Keluar</th><th>Saldo</th></tr>
+                    </thead>
+                    <tbody></tbody>
+                  </table>
+                </div>
+              </div>
 
   <div class="card table-card" style="flex: 1;">
     <h4 class="text-red" style="border-bottom: 2px solid #ffe5e5; padding-bottom: 10px;">
