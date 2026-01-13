@@ -47,6 +47,16 @@
         <div id="page-dashboard" class="page-section">
           <div class="filter-card">
             <label>Periode:</label>
+            
+            <select id="filterPreset" onchange="applyDatePreset(this.value)" style="margin-right: 10px; border: 1px solid #ddd; border-radius: 50px; padding: 8px 15px;">
+                <option value="default">Filter Cepat</option>
+                
+                <option value="today">Hari Ini</option>
+                <option value="yesterday">Kemarin</option>
+                <option value="last7">7 Hari Terakhir</option>
+                <option value="thisMonth">Full Bulan Ini</option>
+                <option value="lastMonth">Bulan Kemarin</option>
+            </select>
             <div class="date-wrapper">
               <input type="date" id="dashStart"> 
               <span class="date-divider">s/d</span> 
@@ -250,19 +260,27 @@
             
               <div class="report-controls">
                 
-                <div class="filter-group">
-                  <select id="repCabang">
-                    <option value="">Semua Cabang</option>
-                  </select>
-                  
-                  <input type="date" id="repStart">
-                  <span class="date-sep">-</span>
-                  <input type="date" id="repEnd">
-                  
-                  <button class="btn-filter" onclick="loadReport()">
-                    <i class="fas fa-filter"></i> Filter
-                  </button>
-                </div>
+              <div class="filter-group">
+                <select id="repCabang" onchange="loadReport()">
+                  <option value="">Semua Cabang</option>
+                </select>
+                
+                <select id="reportPreset" onchange="applyReportPreset(this.value)">
+                  <option value="">- Filter Waktu -</option>
+                  <option value="today">Hari Ini</option>
+                  <option value="yesterday">Kemarin</option>
+                  <option value="last7">7 Hari Terakhir</option>
+                  <option value="thisMonth">Bulan Ini</option>
+                  <option value="lastMonth">Bulan Kemarin</option>
+                </select>
+                <input type="date" id="repStart">
+                <span class="date-sep">-</span>
+                <input type="date" id="repEnd">
+                
+                <button class="btn-filter" onclick="loadReport()">
+                  <i class="fas fa-filter"></i> Filter
+                </button>
+              </div>
 
                 <div class="export-group">
                   <button class="btn-laba" onclick="askExportFormat()">
