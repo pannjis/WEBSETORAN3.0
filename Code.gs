@@ -148,7 +148,7 @@ function simpanTransaksiBatch(dataTransaksi) {
 function tambahMasterData(jenis, nilai) {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   let sheetName = '';
-  
+
   switch(jenis) {
     case 'cabang': sheetName = 'Cabang'; break;
     case 'kat_masuk': sheetName = 'Kategori_Pemasukan'; break;
@@ -160,6 +160,11 @@ function tambahMasterData(jenis, nilai) {
     const sheet = ss.getSheetByName(sheetName);
     const id = 'M-' + Date.now();
     sheet.appendRow([id, nilai]);
+    
+    // --- TAMBAHKAN BARIS INI (PENTING!) ---
+    SpreadsheetApp.flush(); 
+    // --------------------------------------
+
     return "Berhasil menambahkan " + nilai;
   }
   return "Gagal";
@@ -238,4 +243,48 @@ function updateTransaksiDetail(updates, idsToDelete) {
 // --- FUNGSI BANTUAN: CEK EMAIL USER ---
 function getUserEmail() {
   return Session.getActiveUser().getEmail();
+}
+
+// --- API: PROSES RE-INPUT (Hapus Lama & Simpan Baru) ---
+function prosesReInputBatch(dataTransaksi, idsHapus) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName('Transaksi');
+  
+  // 1. HAPUS DATA LAMA (Berdasarkan ID yang sedang diedit)
+  // Kita looping dari bawah ke atas agar urutan baris tidak berantakan saat dihapus
+  const data = sheet.getDataRange().getValues();
+  for (let i = data.length - 1; i >= 1; i--) {
+    let currentId = data[i][0];
+    
+    // Cek apakah ID baris ini termasuk yang mau diedit/dihapus?
+    // idsHapus dikirim dari Javascript (editingIds)
+    if (idsHapus.indexOf(currentId) > -1) {
+      sheet.deleteRow(i + 1);
+    }
+  }
+  
+  // 2. SIMPAN DATA BARU (Hasil Edit)
+  const rows = dataTransaksi.map(t => {
+    // Buat ID Baru agar fresh
+    const id = 'TRX-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+    return [
+      id,
+      t.tanggal,
+      t.cabang,
+      t.tipe,
+      t.kategori,
+      t.metode,
+      t.nominal,
+      t.keterangan
+    ];
+  });
+  
+  if (rows.length > 0) {
+    sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
+  }
+  
+  // 3. SIMPAN PERMANEN
+  SpreadsheetApp.flush(); 
+  
+  return "Data berhasil di-update!";
 }
