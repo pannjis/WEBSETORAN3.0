@@ -1096,4 +1096,36 @@ button {
 #reportPreset:hover {
   border-color: #1e6f48;
 }
+
+/* --- PERBAIKAN TABEL TOP PENGELUARAN --- */
+
+/* 1. Target spesifik tabel Top Pengeluaran */
+#tableRincianKeluar {
+  table-layout: fixed; /* Kunci lebar tabel agar tidak melar */
+  width: 100%;
+}
+
+/* 2. Atur Kolom Kategori (Kiri) */
+#tableRincianKeluar td:first-child, 
+#tableRincianKeluar th:first-child {
+  white-space: normal !important; /* Izinkan teks turun baris */
+  word-wrap: break-word;          /* Potong kata jika terlalu panjang */
+  width: 60%;                     /* Beri porsi lebar 60% */
+  vertical-align: middle;         /* Posisi teks di tengah vertikal */
+  font-size: 12px;                /* Perkecil sedikit font kategori */
+  line-height: 1.4;               /* Jarak antar baris teks */
+}
+
+/* 3. Atur Kolom Jumlah (Kanan) */
+#tableRincianKeluar td:last-child, 
+#tableRincianKeluar th:last-child {
+  white-space: nowrap !important; /* Angka tetap satu baris */
+  width: 40%;                     /* Beri porsi lebar 40% */
+  vertical-align: middle;
+}
+
+/* 4. Sembunyikan Scrollbar Horizontal yang mengganggu */
+.card .table-responsive {
+  overflow-x: hidden; 
+}
 </style>
